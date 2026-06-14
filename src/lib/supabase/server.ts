@@ -17,6 +17,12 @@ export function db(): SupabaseClient {
   }
   _client = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
+    global: {
+      // Next.js caches fetch() responses by default, which would serve stale
+      // query results (e.g. a run list cached while empty). Force every
+      // Supabase request to bypass the Next data cache.
+      fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }),
+    },
   });
   return _client;
 }

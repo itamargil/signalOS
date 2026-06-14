@@ -8,7 +8,7 @@ import { analyzeSignal, type ItemDigest } from "@/lib/agent/analysis";
 import { generateReport } from "@/lib/agent/report";
 import { velocity, first, latest, type SamplePoint } from "@/lib/metrics";
 import { runWithCostCtx } from "@/lib/cost";
-import type { Platform, RunConfig } from "@/lib/types";
+import type { Platform, RunConfig, Source } from "@/lib/types";
 
 /**
  * The research run. A durable, multi-day state machine:
@@ -96,78 +96,27 @@ export const researchRun = inngest.createFunction(
     if (!discApproval) return finish(runId, "failed", "Discovery approval timed out");
 
     // ──────────────────── INITIAL TRACKING FETCH ────────────────────
-    await step.run("track-fetch", () => withCost(async () => {
+    // Load approved sources, then fetch each in its OWN step so no single
+    // serverless invocation runs too long (Apify scrapes can take minutes).
+    const approvedSources = await step.run("load-approved", async () => {
       await db().from("runs").update({ status: "running", stage: "tracking" }).eq("id", runId);
-      const { data: sources } = await db()
+      const { data } = await db()
         .from("sources")
         .select("*")
         .eq("run_id", runId)
         .eq("status", "approved");
+      return (data || []) as Source[];
+    });
 
-      let itemCount = 0;
-      for (const src of sources || []) {
-        const adapter = adapterFor(src.platform as Platform);
-        try {
-          await logActivity(runId, "fetch", `Fetching ${src.platform} ${src.handle}…`);
-          // account-level snapshot (followers etc.)
-          const acct = await adapter.resolveHandle(src);
-          if (acct) {
-            await db().from("metric_samples").insert({
-              run_id: runId,
-              source_id: src.id,
-              scope: "account",
-              followers: acct.followers ?? null,
-              score: acct.score ?? null,
-              metrics: acct.raw,
-            });
-          }
-          // items
-          const items = await adapter.fetchItems(src, { limit: 40 });
-          if (!items.length) continue;
-          const { data: rows } = await db()
-            .from("tracked_items")
-            .upsert(
-              items.map((it) => ({
-                run_id: runId,
-                source_id: src.id,
-                platform: src.platform,
-                external_id: it.external_id,
-                url: it.url ?? null,
-                author: it.author ?? null,
-                title: it.title ?? null,
-                body: it.body?.slice(0, 4000) ?? null,
-                posted_at: it.posted_at ?? null,
-                metadata: {},
-              })),
-              { onConflict: "run_id,platform,external_id" }
-            )
-            .select("id,external_id");
+    let itemCount = 0;
+    for (const src of approvedSources) {
+      const n: number = await step.run(`fetch-${src.id}`, () =>
+        withCost(() => fetchSource(runId, src))
+      );
+      itemCount += n;
+    }
 
-          const idByExt = new Map((rows || []).map((r: any) => [r.external_id, r.id]));
-          const samples = items
-            .filter((it) => idByExt.has(it.external_id))
-            .map((it) => ({
-              run_id: runId,
-              source_id: src.id,
-              tracked_item_id: idByExt.get(it.external_id),
-              scope: "post" as const,
-              likes: it.metrics.likes ?? null,
-              comments: it.metrics.comments ?? null,
-              shares: it.metrics.shares ?? null,
-              views: it.metrics.views ?? null,
-              score: it.metrics.score ?? null,
-              metrics: it.metrics.raw,
-            }));
-          if (samples.length) await db().from("metric_samples").insert(samples);
-          itemCount += samples.length;
-          await logActivity(runId, "sample", `Fetched ${samples.length} items from ${src.platform} ${src.handle}`);
-        } catch (e) {
-          await logActivity(runId, "error", `Fetch failed for ${src.platform} ${src.handle}`, {
-            error: e instanceof Error ? e.message : String(e),
-          });
-        }
-      }
-
+    await step.run("track-gate", async () => {
       await db().from("approvals").insert({
         run_id: runId,
         stage: "tracking",
@@ -178,7 +127,7 @@ export const researchRun = inngest.createFunction(
       await db().from("runs").update({ status: "awaiting_approval" }).eq("id", runId);
       await logActivity(runId, "approval_requested", `Tracking ${itemCount} items — confirm to begin sampling`);
       await notifyApproval({ runId, ideaTitle, stage: "tracking", count: itemCount });
-    }));
+    });
 
     const trackApproval = await step.waitForEvent("wait-tracking", {
       event: EVENTS.approvalDecided,
@@ -269,6 +218,72 @@ async function finish(runId: string, status: string, error: string) {
   await db().from("runs").update({ status, error }).eq("id", runId);
   await logActivity(runId, "error", error);
   return { runId, status, error };
+}
+
+/** Fetch one source's items + initial metrics. Returns items tracked. */
+async function fetchSource(runId: string, src: Source): Promise<number> {
+  const adapter = adapterFor(src.platform as Platform);
+  try {
+    await logActivity(runId, "fetch", `Fetching ${src.platform} ${src.handle}…`);
+    const acct = await adapter.resolveHandle(src);
+    if (acct) {
+      await db().from("metric_samples").insert({
+        run_id: runId,
+        source_id: src.id,
+        scope: "account",
+        followers: acct.followers ?? null,
+        score: acct.score ?? null,
+        metrics: acct.raw,
+      });
+    }
+    const items = await adapter.fetchItems(src, { limit: 40 });
+    if (!items.length) {
+      await logActivity(runId, "fetch", `No items from ${src.platform} ${src.handle}`);
+      return 0;
+    }
+    const { data: rows } = await db()
+      .from("tracked_items")
+      .upsert(
+        items.map((it) => ({
+          run_id: runId,
+          source_id: src.id,
+          platform: src.platform,
+          external_id: it.external_id,
+          url: it.url ?? null,
+          author: it.author ?? null,
+          title: it.title ?? null,
+          body: it.body?.slice(0, 4000) ?? null,
+          posted_at: it.posted_at ?? null,
+          metadata: {},
+        })),
+        { onConflict: "run_id,platform,external_id" }
+      )
+      .select("id,external_id");
+
+    const idByExt = new Map((rows || []).map((r: any) => [r.external_id, r.id]));
+    const samples = items
+      .filter((it) => idByExt.has(it.external_id))
+      .map((it) => ({
+        run_id: runId,
+        source_id: src.id,
+        tracked_item_id: idByExt.get(it.external_id),
+        scope: "post" as const,
+        likes: it.metrics.likes ?? null,
+        comments: it.metrics.comments ?? null,
+        shares: it.metrics.shares ?? null,
+        views: it.metrics.views ?? null,
+        score: it.metrics.score ?? null,
+        metrics: it.metrics.raw,
+      }));
+    if (samples.length) await db().from("metric_samples").insert(samples);
+    await logActivity(runId, "sample", `Fetched ${samples.length} items from ${src.platform} ${src.handle}`);
+    return samples.length;
+  } catch (e) {
+    await logActivity(runId, "error", `Fetch failed for ${src.platform} ${src.handle}`, {
+      error: e instanceof Error ? e.message : String(e),
+    });
+    return 0;
+  }
 }
 
 /** Re-sample engagement for every tracked item + account in the run. */
