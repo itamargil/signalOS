@@ -64,7 +64,21 @@
       "Bash(echo \"dev:    $\\(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/ 2>/dev/null\\)\")",
       "Bash(curl -s -o /dev/null -w '%{http_code}' http://localhost:8288/)",
       "Bash(echo \"inngest: $\\(curl -s -o /dev/null -w '%{http_code}' http://localhost:8288/ 2>/dev/null\\)\")",
-      "Bash(npx --yes inngest-cli@latest dev -u http://localhost:3000/api/inngest)"
+      "Bash(npx --yes inngest-cli@latest dev -u http://localhost:3000/api/inngest)",
+      "Bash(curl -s http://localhost:3000/)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" \"http://localhost:3000/runs/519b5af2-79e6-4c7c-9d82-d14e81a7461a\")",
+      "Bash(git rm *)",
+      "Bash(git add *)",
+      "Bash(git commit -q -m ' *)",
+      "Bash(git push *)",
+      "Bash(curl -s \"http://localhost:3000/runs/026fa6b5-1f6e-4b53-b53b-63a2fcf6485e\")",
+      "Bash(curl -s \"http://localhost:3000/runs/519b5af2-79e6-4c7c-9d82-d14e81a7461a\")",
+      "Bash(curl -s -o /dev/null -w \"dev: %{http_code}\\\\n\" --retry 40 --retry-all-errors --retry-connrefused --retry-delay 1 http://localhost:3000/)",
+      "Bash(curl -s -o /dev/null -w \"inngest: %{http_code}\\\\n\" --retry 40 --retry-all-errors --retry-connrefused --retry-delay 1 http://localhost:8288/)",
+      "Bash(curl -s \"http://localhost:3000/runs/8ed1c019-ed76-498e-b82f-c585b8d16f5f\")",
+      "WebFetch(domain:www.upload-post.com)",
+      "WebFetch(domain:zernio.com)",
+      "Bash(echo \"inngest: $\\(curl -s -o /dev/null -w '%{http_code}' http://localhost:8288/ 2>/dev/null || echo down\\)\")"
     ]
   }
 }

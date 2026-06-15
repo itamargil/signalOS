@@ -15,6 +15,7 @@ export async function POST(req: Request) {
     : ["reddit", "x", "instagram"];
   const trackingDays = Number(body.trackingDays) || 3;
   const samples = Number(body.samples) || 6;
+  const reviewPrompts = body.reviewPrompts !== false; // default on
 
   // 1. idea
   const { data: idea, error: ideaErr } = await db()
@@ -33,7 +34,7 @@ export async function POST(req: Request) {
       idea_id: idea.id,
       status: "pending",
       stage: "created",
-      config: { platforms, trackingDays, samples },
+      config: { platforms, trackingDays, samples, reviewPrompts },
     })
     .select()
     .single();

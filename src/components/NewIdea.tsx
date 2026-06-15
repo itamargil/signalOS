@@ -10,8 +10,6 @@ export function NewIdea() {
   const [prompt, setPrompt] = useState("");
   const [title, setTitle] = useState("");
   const [platforms, setPlatforms] = useState<string[]>([...PLATFORMS]);
-  const [trackingDays, setTrackingDays] = useState(3);
-  const [samples, setSamples] = useState(6);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -26,7 +24,7 @@ export function NewIdea() {
       const res = await fetch("/api/ideas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, title, platforms, trackingDays, samples }),
+        body: JSON.stringify({ prompt, title, platforms }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "failed");
@@ -66,26 +64,7 @@ export function NewIdea() {
             </button>
           ))}
         </div>
-        <label className="text-xs text-muted flex items-center gap-2">
-          window (days)
-          <input
-            type="number"
-            min={1}
-            className="input w-16 py-1"
-            value={trackingDays}
-            onChange={(e) => setTrackingDays(Number(e.target.value))}
-          />
-        </label>
-        <label className="text-xs text-muted flex items-center gap-2">
-          samples
-          <input
-            type="number"
-            min={1}
-            className="input w-16 py-1"
-            value={samples}
-            onChange={(e) => setSamples(Number(e.target.value))}
-          />
-        </label>
+        <span className="text-xs text-muted">You'll review &amp; run each step manually.</span>
       </div>
       {err && <p className="text-bad text-sm">{err}</p>}
       <button className="btn" onClick={submit} disabled={busy || !prompt.trim()}>

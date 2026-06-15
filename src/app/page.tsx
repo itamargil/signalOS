@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/supabase/server";
 import { NewIdea } from "@/components/NewIdea";
 import { StatusBadge } from "@/components/StatusBadge";
+import { AutoRefresh } from "@/components/AutoRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -12,13 +13,18 @@ export default async function Home() {
     .order("created_at", { ascending: false })
     .limit(50);
 
+  const anyActive = (runs || []).some(
+    (r: any) => !["completed", "failed", "cancelled"].includes(r.status)
+  );
+
   return (
     <div className="space-y-8">
+      <AutoRefresh active={anyActive} intervalMs={3000} />
       <section>
         <h1 className="text-xl font-semibold mb-1">New idea</h1>
         <p className="text-muted text-sm mb-4">
-          Feed a product idea. The agent proposes sources, waits for your approval,
-          tracks engagement over a few days, then writes a signal report.
+          Feed a product idea, then drive each step manually — review the prompt or
+          scraper, run it, see the results, advance — until the signal report is done.
         </p>
         <NewIdea />
       </section>

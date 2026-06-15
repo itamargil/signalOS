@@ -3,7 +3,9 @@ export type SourceKind = "subreddit" | "account" | "search_term" | "hashtag";
 export type RunStage =
   | "created"
   | "discovery"
-  | "tracking"
+  | "fetch"
+  | "sample"
+  | "tracking" // legacy (pre manual-runner)
   | "analysis"
   | "report"
   | "done";
@@ -34,6 +36,14 @@ export interface RunConfig {
   platforms: Platform[];
   trackingDays: number; // length of the tracking window
   samples: number; // how many times to re-sample over the window
+  reviewPrompts?: boolean; // (reserved) auto-run toggle, manual-only for now
+}
+
+/** Editable scrape parameters shown at the fetch step. */
+export interface ScrapeSettings {
+  limit: number; // items per source
+  sort?: string; // top | hot | latest (where the platform supports it)
+  time?: string; // hour | day | week | month | year | all
 }
 
 export interface Source {

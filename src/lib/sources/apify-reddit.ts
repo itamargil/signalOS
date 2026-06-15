@@ -68,12 +68,13 @@ export const redditApifyAdapter: SourceAdapter = {
 
   async fetchItems(source: Source, opts) {
     const max = Math.min(opts.limit, 50);
+    const time = opts.time || "month";
     let input: Record<string, unknown>;
     if (source.kind === "subreddit") {
       input = {
         subredditUrls: [subredditUrl(source.handle)],
-        searchSort: "top",
-        searchTime: "month",
+        searchSort: opts.sort || "top",
+        searchTime: time,
         maxPostsCount: max,
         crawlCommentsPerPost: false,
         maxCommentsPerPost: 0,
@@ -85,7 +86,7 @@ export const redditApifyAdapter: SourceAdapter = {
         searchComments: false,
         searchCommunities: false,
         searchSort: "relevance",
-        searchTime: "month",
+        searchTime: time,
         maxPostsCount: max,
         crawlCommentsPerPost: false,
         maxCommentsPerPost: 0,

@@ -33,7 +33,10 @@ export interface SourceAdapter {
   resolveHandle(source: Pick<Source, "kind" | "handle">): Promise<SampleMetrics | null>;
 
   /** Pull current items for an approved source (listing, account posts, search results). */
-  fetchItems(source: Source, opts: { limit: number }): Promise<FetchedItem[]>;
+  fetchItems(
+    source: Source,
+    opts: { limit: number; sort?: string; time?: string }
+  ): Promise<FetchedItem[]>;
 
   /** Re-sample engagement for already-tracked items. Keyed by external_id. */
   sampleItems(

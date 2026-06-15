@@ -1,12 +1,14 @@
 # SignalOS
 
-Idea → **signal** → MVP pipeline. Feed a product idea; a research agent proposes
-where to listen (Reddit, X, Instagram), **waits for your approval at each gate**,
-tracks engagement over a few days, and writes a decision-ready signal report.
+Idea → **signal** → MVP pipeline. A **manual, step-by-step research console**: feed a
+product idea, then drive each step yourself — review the prompt or scraper that will
+run, run it, see the results, advance — until a decision-ready signal report is done.
+Sources: Reddit, X, Instagram.
 
-Every model output — discovery, internal reasoning, analysis, final report — is
-persisted and inspectable in the **LLM Logs** view. Nothing the agent produces is
-ephemeral.
+📚 **Full architecture & rebuild/upgrade docs: [docs/INDEX.md](docs/INDEX.md)**
+
+Every model output — discovery, analysis, final report — is persisted and inspectable
+in the **LLM Logs** view. Nothing the agent produces is ephemeral.
 
 ## Architecture
 
@@ -16,8 +18,8 @@ Next.js dashboard (Vercel)
   ├─ /api/approvals/[id]   your decision → fires "run/approval.decided"
   └─ /api/inngest          serves the durable workflow
 
-Inngest  → research-run (multi-day state machine)
-  discovery → [APPROVAL] → track fetch → [APPROVAL] → sample loop → analysis → report
+Inngest  → research-run (manual step-runner — every step is a gate you run)
+  discovery → fetch → sample(×N) → analysis → report
 
 Supabase (Postgres)
   ideas, runs, sources, tracked_items, metric_samples (time series),

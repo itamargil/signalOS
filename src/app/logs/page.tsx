@@ -50,6 +50,7 @@ export default async function LogsPage({
         {(calls || []).map((c: any) => (
           <details key={c.id} className="card p-0 overflow-hidden">
             <summary className="px-4 py-3 cursor-pointer flex items-center gap-3 text-sm list-none">
+              <span className="text-muted text-xs whitespace-nowrap font-mono">{fmtDateTime(c.created_at)}</span>
               <span className={`chip ${c.status === "error" ? "border-bad text-bad" : "border-edge text-muted"}`}>
                 {c.stage}
               </span>
@@ -88,6 +89,17 @@ export default async function LogsPage({
       </div>
     </div>
   );
+}
+
+function fmtDateTime(ts: string) {
+  return new Date(ts).toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
 }
 
 function Block({ label, children }: { label: string; children: React.ReactNode }) {

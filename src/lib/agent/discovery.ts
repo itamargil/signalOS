@@ -1,17 +1,15 @@
-import { complete, extractJson } from "@/lib/llm/client";
+import { extractJson } from "@/lib/llm/client";
+import type { EditablePrompt } from "./prompt";
 import type { Platform, ProposedSource } from "@/lib/types";
 
 /**
- * Stage 1 — the agent reads the idea and proposes which subreddits,
- * accounts, hashtags and search terms to track on each platform.
- * Output is reviewed/approved by the human before any tracking starts.
+ * Stage 1 — the agent proposes which subreddits, accounts, hashtags and search
+ * terms to track on each platform. Output is reviewed/approved by the human.
  */
-export async function proposeSources(args: {
-  runId: string;
-  ideaId: string;
-  prompt: string;
-  platforms: Platform[];
-}): Promise<ProposedSource[]> {
+export function buildDiscoveryPrompt(
+  prompt: string,
+  platforms: Platform[]
+): EditablePrompt {
   const system = `You are a market-signal research strategist. Given a product idea,
 you propose the best places to listen for genuine demand signal on the requested platforms.
 
@@ -21,32 +19,24 @@ For each platform pick a focused, high-signal set (quality over quantity):
 - instagram: accounts (kind "account", handle like "@username") and hashtag (handle like "#tag")
 
 Favor communities where the target user actually complains, asks for help, or shows buying intent.
-Avoid generic mega-subreddits unless clearly relevant. Give a one-sentence rationale each.
+Avoid generic mega-subreddits unless clearly relevant. Give a one-sentence rationale each.`;
 
-Return ONLY JSON of this shape:
+  const lockedSuffix = `Return ONLY JSON of this shape:
 {"sources":[{"platform":"reddit","kind":"subreddit","handle":"r/...","url":"https://...","rationale":"..."}]}
 Aim for 4-8 sources per requested platform.`;
 
   const user = `Product idea:
 """
-${args.prompt}
+${prompt}
 """
 
-Requested platforms: ${args.platforms.join(", ")}.
+Requested platforms: ${platforms.join(", ")}.
 Propose the sources.`;
 
-  const { text } = await complete({
-    runId: args.runId,
-    ideaId: args.ideaId,
-    stage: "discovery",
-    purpose: "propose_sources",
-    system,
-    messages: [{ role: "user", content: user }],
-    maxTokens: 2000,
-  });
+  return { system, lockedSuffix, user };
+}
 
+export function parseDiscovery(text: string, platforms: Platform[]): ProposedSource[] {
   const parsed = extractJson<{ sources: ProposedSource[] }>(text);
-  return (parsed.sources || []).filter((s) =>
-    args.platforms.includes(s.platform)
-  );
+  return (parsed.sources || []).filter((s) => platforms.includes(s.platform));
 }
