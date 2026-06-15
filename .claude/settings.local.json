@@ -78,7 +78,8 @@
       "Bash(curl -s \"http://localhost:3000/runs/8ed1c019-ed76-498e-b82f-c585b8d16f5f\")",
       "WebFetch(domain:www.upload-post.com)",
       "WebFetch(domain:zernio.com)",
-      "Bash(echo \"inngest: $\\(curl -s -o /dev/null -w '%{http_code}' http://localhost:8288/ 2>/dev/null || echo down\\)\")"
+      "Bash(echo \"inngest: $\\(curl -s -o /dev/null -w '%{http_code}' http://localhost:8288/ 2>/dev/null || echo down\\)\")",
+      "Bash(curl -s -o /dev/null -w \"dev: %{http_code}\\\\n\" --retry 60 --retry-all-errors --retry-connrefused --retry-delay 1 http://localhost:3000/)"
     ]
   }
 }
